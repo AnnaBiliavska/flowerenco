@@ -11,6 +11,7 @@ export const GET: APIRoute = async () => {
     const cart = await currentCart.getCurrentCart();
     const lineItems = (cart?.lineItems || []).map((li: any) => ({
       id: li._id,
+      productId: li.catalogReference?.catalogItemId,
       name: li.productName?.original || li.productName || "Vase",
       quantity: li.quantity,
       price: li.price?.amount,

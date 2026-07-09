@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type LineItem = { id: string; name: string; quantity: number; price?: string; image?: string };
+type LineItem = { id: string; productId?: string; name: string; quantity: number; price?: string; image?: string };
 
 export default function CartView() {
   const [items, setItems] = useState<LineItem[] | null>(null);
@@ -10,6 +10,7 @@ export default function CartView() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingQtyId, setUpdatingQtyId] = useState<string | null>(null);
 
   function load() {
     return fetch("/api/cart/get")
@@ -41,6 +42,23 @@ export default function CartView() {
       setMsg("Could not delete that item — try again?");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function updateQty(lineItemId: string, quantity: number) {
+    setUpdatingQtyId(lineItemId);
+    try {
+      await fetch("/api/cart/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineItemId, quantity }),
+      });
+      window.dispatchEvent(new Event("cart:updated"));
+      await load();
+    } catch {
+      setMsg("Could not update quantity — try again?");
+    } finally {
+      setUpdatingQtyId(null);
     }
   }
 
@@ -126,6 +144,7 @@ export default function CartView() {
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-|-$/g, "");
           const pic = b.photo || li.image || "";
+          const isBusy = deletingId === li.id || updatingQtyId === li.id;
           return (
             <div className="item card" key={li.id}>
               {pic ? (
@@ -143,7 +162,7 @@ export default function CartView() {
                     type="button"
                     className="btn ghost change"
                     onClick={() => changeProduct(li.id, slug, b)}
-                    disabled={deletingId === li.id}
+                    disabled={isBusy}
                   >
                     Change product
                   </button>
@@ -151,7 +170,7 @@ export default function CartView() {
                     type="button"
                     className="btn delete"
                     onClick={() => deleteItem(li.id)}
-                    disabled={deletingId === li.id}
+                    disabled={isBusy}
                   >
                     {deletingId === li.id ? (
                       <><span className="spin" aria-hidden="true" /> Deleting…</>
@@ -163,7 +182,27 @@ export default function CartView() {
               </div>
               <div className="item-price">
                 <span className="price">{money(li.price)}</span>
-                {li.quantity ? <span className="qty">Qty {li.quantity}</span> : null}
+                {li.quantity != null && (
+                  <div className="qty-stepper">
+                    <button
+                      type="button"
+                      className="qty-btn"
+                      aria-label="Decrease quantity"
+                      onClick={() => updateQty(li.id, li.quantity - 1)}
+                      disabled={isBusy || li.quantity <= 1}
+                    >−</button>
+                    <span className="qty-count">
+                      {updatingQtyId === li.id ? <span className="spin sm" aria-hidden="true" /> : li.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      className="qty-btn"
+                      aria-label="Increase quantity"
+                      onClick={() => updateQty(li.id, li.quantity + 1)}
+                      disabled={isBusy}
+                    >+</button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -204,11 +243,16 @@ export default function CartView() {
         .delete { background: var(--paper); color: var(--tomato); border-color: var(--tomato); box-shadow: 3px 3px 0 var(--tomato); }
         .delete:hover:not([disabled]) { background: var(--tomato); color: var(--paper); }
         .spin { display: inline-block; width: 14px; height: 14px; border: 2.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: cart-spin 0.6s linear infinite; vertical-align: -2px; margin-right: 0.15rem; }
+        .spin.sm { width: 12px; height: 12px; margin: 0; vertical-align: -1px; }
         @keyframes cart-spin { to { transform: rotate(360deg); } }
-        .item-price { display: grid; gap: 0.2rem; text-align: right; flex: 0 0 auto; }
+        .item-price { display: grid; gap: 0.4rem; text-align: right; flex: 0 0 auto; align-content: start; }
         .item-price .price { font-family: "Fredoka", sans-serif; font-size: 1.2rem; }
-        .item-price .qty { color: var(--ink-soft); font-size: 0.85rem; }
-        @media (max-width: 560px) { .item { flex-wrap: wrap; } .item-price { text-align: left; } }
+        .qty-stepper { display: flex; align-items: center; justify-content: flex-end; gap: 0.3rem; }
+        .qty-btn { width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); font-size: 1rem; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 0 var(--ink); transition: transform .08s; padding: 0; }
+        .qty-btn:hover:not([disabled]) { transform: translate(-1px, -1px); background: var(--mustard); }
+        .qty-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+        .qty-count { font-family: "Fredoka", sans-serif; font-size: 1rem; font-weight: 700; min-width: 22px; text-align: center; }
+        @media (max-width: 560px) { .item { flex-wrap: wrap; } .item-price { text-align: left; } .qty-stepper { justify-content: flex-start; } }
         .summary { padding: 1.4rem; display: grid; gap: 0.9rem; }
         .sub { display: flex; justify-content: space-between; font-family: "Fredoka", sans-serif; font-size: 1.3rem; margin: 0; }
         .policy { background: #cfe6e2; border: 2px solid var(--ink); border-radius: var(--radius-sm); padding: 0.9rem 1.1rem; display: grid; gap: 0.5rem; }

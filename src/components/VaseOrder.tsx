@@ -10,6 +10,7 @@ const STYLE_BLURBS: Record<string, string> = {
   "Blue Willow": "Glossy cobalt-&-white folk florals over pale clay, delft-inspired.",
 };
 const STYLE_ORDER = ["Matte Folk", "Glossy Doodle", "Blue Willow"];
+const SIZE_ORDER = ["Small", "Medium", "Large"];
 
 export default function VaseOrder({
   slug,
@@ -33,7 +34,10 @@ export default function VaseOrder({
     img: styleImages.find((s) => s.style === name)?.url || "",
   }));
 
-  const [size, setSize] = useState(sizes[0]?.name || "");
+  const sortedSizes = [...sizes].sort(
+    (a, b) => SIZE_ORDER.indexOf(a.name) - SIZE_ORDER.indexOf(b.name)
+  );
+  const [size, setSize] = useState(sortedSizes[0]?.name || "");
   const [style, setStyle] = useState(styles[0]?.name || "");
 
   function pickStyle(name: string) {
@@ -53,7 +57,7 @@ export default function VaseOrder({
     if (!raw) return;
     try {
       const p = JSON.parse(raw);
-      if (p.size && sizes.some((s) => s.name === p.size)) setSize(p.size);
+      if (p.size && sortedSizes.some((s) => s.name === p.size)) setSize(p.size);
       if (p.style && styles.some((s) => s.name === p.style)) {
         setStyle(p.style);
         window.dispatchEvent(new CustomEvent("flowerenco:style", { detail: { style: p.style } }));
@@ -74,7 +78,7 @@ export default function VaseOrder({
     const n = Number(a);
     return Number.isNaN(n) ? "" : new Intl.NumberFormat("en-US", { style: "currency", currency }).format(n);
   };
-  const current = sizes.find((s) => s.name === size);
+  const current = sortedSizes.find((s) => s.name === size);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -121,7 +125,7 @@ export default function VaseOrder({
       <div className="step">
         <p className="step-h"><span className="num">1</span> Pick a size</p>
         <div className="sizes">
-          {sizes.map((s) => (
+          {sortedSizes.map((s) => (
             <button
               key={s.name}
               type="button"
